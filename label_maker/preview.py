@@ -9,7 +9,7 @@ import numpy as np
 import requests
 from PIL import Image, ImageDraw
 
-from label_maker.utils import url, class_match
+from label_maker.utils import url, class_match, url_bing
 
 def preview(dest_folder, number, classes, imagery, ml_type, **kwargs):
     """Produce imagery examples for specified classes
@@ -53,11 +53,13 @@ def preview(dest_folder, number, classes, imagery, ml_type, **kwargs):
         if not op.isdir(class_dir):
             makedirs(class_dir)
 
-        class_tiles = [t for t in tiles.files if class_match(ml_type, tiles[t], i + 1)]
-        class_tiles = class_tiles[:number]
-        print('Downloading {} tiles for class {}'.format(len(class_tiles), cl.get('name')))
-        for tile in class_tiles:
-            r = requests.get(url(tile.split('-'), imagery))
+        class_tiles = (t for t in tiles.files
+                       if class_match(ml_type, tiles[t], i + 1))
+        print('Downloading at most {} tiles for class {}'.format(number, cl.get('name')))
+        for n, tile in enumerate(class_tiles):
+            if n > number:
+                break
+            r = requests.get(url_bing(tile.split('-'), imagery))
             tile_img = op.join(dest_folder, 'examples', cl.get('name'),
                                '{}{}'.format(tile, image_format))
             open(tile_img, 'wb').write(r.content)

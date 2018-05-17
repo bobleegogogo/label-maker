@@ -15,6 +15,7 @@ from label_maker.preview import preview
 from label_maker.images import download_images
 from label_maker.package import package_directory
 from label_maker.validate import schema
+from label_maker.images_all import download_images_all
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,8 @@ def parse_args(args):
     l = subparsers.add_parser('labels', parents=[pparser], help='', formatter_class=dhf)
     p = subparsers.add_parser('preview', parents=[pparser], help='', formatter_class=dhf)
     subparsers.add_parser('images', parents=[pparser], help='', formatter_class=dhf)
+    subparsers.add_parser('images_all', parents=[pparser], help='', formatter_class=dhf)
+
     subparsers.add_parser('package', parents=[pparser], help='', formatter_class=dhf)
 
     # labels has an optional parameter
@@ -87,6 +90,8 @@ def cli():
         preview(dest_folder=dest_folder, number=number, **config)
     elif cmd == 'images':
         download_images(dest_folder=dest_folder, **config)
+    elif cmd == 'images_all':
+        download_images_all(dest_folder=dest_folder, **config)
     elif cmd == 'package':
         package_directory(dest_folder=dest_folder, **config)
 

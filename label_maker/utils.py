@@ -1,9 +1,10 @@
+# pylint: disable=unused-argument
 """Provide utility functions"""
 from os import path as op
 from urllib.parse import urlparse
 
 from mercantile import bounds
-from pyproj import Proj
+from pyproj import Proj, transform
 from PIL import Image
 import numpy as np
 import requests
@@ -12,6 +13,11 @@ import rasterio
 def url(tile, imagery):
     """Return a tile url provided an imagery template and a tile"""
     return imagery.replace('{x}', tile[0]).replace('{y}', tile[1]).replace('{z}', tile[2])
+
+def url_bing(tile, imagery):
+    """Return a tile url provided an imagery template and a tile"""
+    quadKey=tile_coords_and_zoom_to_quadKey(int(tile[0]), int(tile[1]), int(tile[2]))
+    return imagery.replace('{}',quadKey)
 
 def class_match(ml_type, label, i):
     """Determine if a label matches a given class index"""
@@ -23,15 +29,23 @@ def class_match(ml_type, label, i):
         return np.count_nonzero(label == i)
     return None
 
-def download_tile_tms(tile, imagery, dest_folder):
+def download_tile_tms(tile, imagery, dest_folder, *args):
     """Download a satellite image tile from a tms endpoint"""
     o = urlparse(imagery)
     _, image_format = op.splitext(o.path)
-    r = requests.get(url(tile.split('-'), imagery))
+    r = requests.get(url_bing(tile.split('-'), imagery))
     tile_img = op.join(dest_folder, 'tiles', '{}{}'.format(tile, image_format))
     open(tile_img, 'wb').write(r.content)
 
-def get_tile_tif(tile, imagery, dest_folder):
+def download_tile_tms_all(tile, imagery, dest_folder, *args):
+    """Download a satellite image tile from a tms endpoint"""
+    o = urlparse(imagery)
+    _, image_format = op.splitext(o.path)
+    r = requests.get(url_bing(tile.split('-'), imagery))
+    tile_img = op.join(dest_folder, 'tiles_all', '{}{}'.format(tile, image_format))
+    open(tile_img, 'wb').write(r.content)
+
+def get_tile_tif(tile, imagery, dest_folder, imagery_offset):
     """
     Read a GeoTIFF with a window corresponding to a TMS tile
 
@@ -42,13 +56,25 @@ def get_tile_tif(tile, imagery, dest_folder):
     http://www.cogeo.org/in-depth.html
     """
     bound = bounds(*[int(t) for t in tile.split('-')])
+    imagery_offset = imagery_offset or [0, 0]
     with rasterio.open(imagery) as src:
         x_res, y_res = src.transform[0], src.transform[4]
-        proj_to = Proj(**src.crs)
+        p1 = Proj({'init': 'epsg:4326'})
+        p2 = Proj(**src.crs)
+
+        # offset our imagery in the "destination pixel" space
+        offset_bound = dict()
+        deg_per_pix_x = (bound.west - bound.east) / 256
+        deg_per_pix_y = (bound.north - bound.south) / 256
+
+        offset_bound['west'] = bound.west + imagery_offset[0] * deg_per_pix_x
+        offset_bound['east'] = bound.east + imagery_offset[0] * deg_per_pix_x
+        offset_bound['north'] = bound.north + imagery_offset[1] * deg_per_pix_y
+        offset_bound['south'] = bound.south + imagery_offset[1] * deg_per_pix_y
 
         # project tile boundaries from lat/lng to source CRS
-        tile_ul_proj = proj_to(bound.west, bound.north)
-        tile_lr_proj = proj_to(bound.east, bound.south)
+        tile_ul_proj = transform(p1, p2, offset_bound['west'], offset_bound['north'])
+        tile_lr_proj = transform(p1, p2, offset_bound['east'], offset_bound['south'])
         # get origin point from the TIF
         tif_ul_proj = (src.bounds.left, src.bounds.top)
 
@@ -69,3 +95,16 @@ def get_tile_tif(tile, imagery, dest_folder):
         tile_img = op.join(dest_folder, 'tiles', '{}{}'.format(tile, '.jpg'))
         img = Image.fromarray(np.moveaxis(data, 0, -1), mode='RGB')
         img.save(tile_img)
+
+def tile_coords_and_zoom_to_quadKey(x, y, zoom):
+    """Create a quadkey for use with certain tileservers that use them."""
+    quadKey = ''
+    for i in range(zoom, 0, -1):
+        digit = 0
+        mask = 1 << (i - 1)
+        if (x & mask) != 0:
+            digit += 1
+        if (y & mask) != 0:
+            digit += 2
+        quadKey += str(digit)
+    return quadKey

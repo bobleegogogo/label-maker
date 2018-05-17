@@ -6,9 +6,9 @@ from random import shuffle
 
 import numpy as np
 import os
-from label_maker.utils import download_tile_tms, get_tile_tif
+from label_maker.utils import download_tile_tms_all, get_tile_tif
 
-def download_images(dest_folder, classes, imagery, ml_type, background_ratio, imagery_offset=False, **kwargs):
+def download_images_all(dest_folder, classes, imagery, ml_type, background_ratio, imagery_offset=False, **kwargs):
     """Download satellite images specified by a URL and a label.npz file
     Parameters
     ------------
@@ -39,42 +39,19 @@ def download_images(dest_folder, classes, imagery, ml_type, background_ratio, im
     tiles = np.load(labels_file)
 
     # create tiles directory
-    tiles_dir = op.join(dest_folder, 'tiles')
+    tiles_dir = op.join(dest_folder, 'tiles_all')
     if not op.isdir(tiles_dir):
         makedirs(tiles_dir)
 
-    # find tiles which have any matching class
-    def class_test(value):
-        """Determine if a label matches a given class index"""
-        if ml_type == 'object-detection':
-            return len(value)
-        elif ml_type == 'segmentation':
-            return np.sum(value) > 0
-        elif ml_type == 'classification':
-            return value[0] == 0
-        return None
-    class_tiles = [tile for tile in tiles.files if class_test(tiles[tile])]
-
-    # for classification problems with a single class, we also get background
-    # tiles up to len(class_tiles) * config.get('background_ratio')
-    background_tiles = []
-    limit = len(class_tiles) * background_ratio
-    if ml_type == 'classification' and len(classes) == 1:
-        background_tiles_full = [tile for tile in tiles.files if tile not in class_tiles]
-        shuffle(background_tiles_full)
-        background_tiles = background_tiles_full[:limit]
-
-    # download tiles
-    tiles = class_tiles + background_tiles
-    print('Downloading {} tiles to {}'.format(len(tiles), op.join(dest_folder, 'tiles')))
+    tiles  = [tile for tile in tiles.files ]
+	
+    print('Downloading all {} tiles to {}'.format(len(tiles), op.join(dest_folder, 'tiles_all')))
 
     # get image acquisition function based on imagery string
-    image_function = download_tile_tms
+    image_function = download_tile_tms_all
     if op.splitext(imagery)[1].lower() in ['.tif', '.tiff']:
-        image_function = get_tile_tif
-    tile_out_path = os.path.join(dest_folder,"index_tiles_GT.lst")
-    with open(tile_out_path,'wt') as f:   
-        for tile in tiles:
-              f.write(tile + '\n')
-              image_function(tile, imagery, dest_folder, imagery_offset)
+        image_function = get_tile_tif  
+		
+    for tile in tiles:
+        image_function(tile, imagery, dest_folder, imagery_offset)
          
