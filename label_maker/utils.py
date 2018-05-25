@@ -36,6 +36,7 @@ def download_tile_tms(tile, imagery, dest_folder, *args):
     r = requests.get(url_bing(tile.split('-'), imagery))
     tile_img = op.join(dest_folder, 'tiles', '{}{}'.format(tile, image_format))
     open(tile_img, 'wb').write(r.content)
+    r.keep_alive = False
 
 def download_tile_tms_all(tile, imagery, dest_folder, *args):
     """Download a satellite image tile from a tms endpoint"""
@@ -44,6 +45,7 @@ def download_tile_tms_all(tile, imagery, dest_folder, *args):
     r = requests.get(url_bing(tile.split('-'), imagery))
     tile_img = op.join(dest_folder, 'tiles_all', '{}{}'.format(tile, image_format))
     open(tile_img, 'wb').write(r.content)
+    r.keep_alive = False
 
 def get_tile_tif(tile, imagery, dest_folder, imagery_offset):
     """
